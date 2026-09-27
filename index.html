@@ -1098,59 +1098,55 @@
         }
 
         let gameScriptLoaded = false;
-        function loadGameScript() {
-            if (gameScriptLoaded) return;
-            gameScriptLoaded = true;
-            // Create script directly to avoid inert template nodes
-            const script = document.createElement("script");
-            script.async = true;
-            script.src = "kisakcod-sp.js?v=creditsmute1";
-            document.body.appendChild(script);
-        }
 
-        function playGame() {
-            if (!window.__kisakOpfsReady) {
-                status("The game files are not installed yet.");
-                return;
-            }
-            installerPanel.style.display = "none";
-            document.body.classList.add("game-running");
-            resizeGameCanvas();
-            try { canvas.focus(); } catch { }
-            loadGameScript();
-        }
+function loadGameScript() {
+    if (gameScriptLoaded) return;
+    gameScriptLoaded = true;
 
-        function formatBytes(bytes) {
-            if (!Number.isFinite(bytes)) return "unknown size";
-            if (bytes < 1024) return bytes + " B";
-            if (bytes < 1024 ** 2) return (bytes / 1024).toFixed(1) + " KiB";
-            if (bytes < 1024 ** 3) return (bytes / 1024 ** 2).toFixed(1) + " MiB";
-            return (bytes / 1024 ** 3).toFixed(2) + " GiB";
-        }
+    log("Booting KisakCOD engine...");
 
-        installButton.addEventListener("click", installGame);
-        playButton.addEventListener("click", playGame);
-        wipeButton.addEventListener("click", wipeGame);
+    // 1. Tell Emscripten where to look for OPFS files
+    Module.arguments = [
+        "+set", "fs_basepath", "/cod4",
+        "+set", "fs_homepath", "/cod4",
+        "+set", "com_introplayed", "1"
+    ];
 
-        async function initializeInstaller() {
-            try {
-                const installed = await hasInstalledGame();
-                if (installed) {
-                    window.__kisakOpfsReady = true;
-                    localStorage.setItem("kisak_opfs_ready", "1");
-                    status("Game data is already installed.");
-                    playButton.disabled = false;
-                    log("Existing /cod4 installation found.");
-                } else {
-                    window.__kisakOpfsReady = false;
-                    status("Game files are not installed.");
-                }
-            } catch (err) {
-                console.error(err);
-                status("Unable to inspect browser storage.");
-            }
-        }
+    // 2. Dynamically create script tag with cache-buster to prevent 503/stale cache
+    const script = document.createElement("script");
+    script.async = true;
+    script.src = "kisakcod-sp.js?t=" + Date.now();
 
+    script.onload = () => {
+        log("kisakcod-sp.js loaded successfully. Initializing WASM runtime...");
+    };
+
+    script.onerror = (e) => {
+        log("CRITICAL ERROR: Failed to load kisakcod-sp.js! Check network tab or host.");
+        console.error("Script load error:", e);
+    };
+
+    document.body.appendChild(script);
+}
+
+function playGame() {
+    if (!window.__kisakOpfsReady) {
+        status("The game files are not installed yet.");
+        return;
+    }
+
+    installerPanel.style.display = "none";
+    document.body.classList.add("game-running");
+    resizeGameCanvas();
+
+    try {
+        canvas.focus({ preventScroll: true });
+    } catch {
+        try { canvas.focus(); } catch { }
+    }
+
+    loadGameScript();
+}
         initializeInstaller();
     </script>
 </body>
